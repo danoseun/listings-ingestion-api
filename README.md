@@ -63,6 +63,7 @@ To support new JSON sources with different structures:
 
 ## Notes
 - The solution uses streaming to handle large JSON files (up to 1GB).
+- The solution ensures that ingestion resumes from where it stopped. For this an ingestion schema is created to store and track the state.
 - Data duplication was prevented by doing the following:
   - Creating a compound unique index on `id` and `source` in the listings collection to prevent duplicate insertions at the database level. This ensures that MongoDB rejects any document with the same id and source combination.
   - Upsert During Ingestion: Instead of using `insertMany`, I used `bulkWrite` with updateOne operations in upsert mode `(upsert: true)`.This checks if a document with the same `id` and `source` exists; if it does, it updates the document; if not, it inserts a new one.
@@ -76,3 +77,27 @@ To support new JSON sources with different structures:
 - MongoDB indexes ensure efficient querying.
 - The data model is extensible via the `attributes` field.
 - The ingestion runs hourly via a cron job and can be triggered manually.
+
+## Improvements
+1. Performance Optimisation
+   - Ingestion Bottlenecks: The current streaming approach (JSONStream with batch upserts) is memory-efficient but can be slow for very large files (eg., source2 with more data size). Parallel processing or distributed ingestion could improve throughput(e.g., `Bull with Redis` or `Kafka` for very large files).
+   - Database Performance: MongoDB indexes are in place, but heavy read/write operations under high load may require sharding or replication.
+   - API Response Time: The `GET /listings` endpoint uses pagination, but complex queries (e.g., regex on city) can be slow without caching.
+   - Monitor index usage with `explain()` and remove unused indexes to reduce write overhead.
+
+2. Reliability and Fault Tolerance
+   - Error Recovery: The ingestion process lacks retry mechanisms for transient failures (e.g., network issues with S3 or MongoDB timeouts).
+   - Idempotency: Deduplication via unique indexes and upserts is in place and robust, but ingestion failures mid-process could leave partial data.
+   - Monitoring: Lack of metrics or alerts for ingestion failures, API errors, or performance degradation.
+
+3. Scalability
+   - Horizontal Scaling: The single Node.js process may become a bottleneck under high load. A containerized, distributed architecture may be considered in place.
+   - Source Scalability: Adding more sources or larger files requires dynamic source management and load balancing.
+   - Database Scalability: MongoDB may need to scale out (sharding) or use a read replica for high read traffic. 
+
+4. Maintainability
+   - Configuration: Hardcoded URLs and batch sizes limit flexibility. We could move those to environment variables or a configuration service.
+   - Logging: Structured logging and centralized log aggregation are needed and helpful for debugging.
+
+5. Security
+   - API Security: Some form of authentication or rate limiting especially on the `GET /listings` endpoint would be useful here in a production setting
