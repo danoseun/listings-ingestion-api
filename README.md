@@ -63,7 +63,7 @@ To support new JSON sources with different structures:
 
 ## Notes
 - The solution uses streaming to handle large JSON files (up to 1GB).
-- The solution ensures that ingestion resumes from where it stopped. For this an ingestion schema is created to store and track the state.
+- The solution ensures that ingestion resumes from where it stopped in the event that there's a timeout for any reason. For this, an ingestion schema is created to store and track the state of the ingestion process.
 - Data duplication was prevented by doing the following:
   - Creating a compound unique index on `id` and `source` in the listings collection to prevent duplicate insertions at the database level. This ensures that MongoDB rejects any document with the same id and source combination.
   - Upsert During Ingestion: Instead of using `insertMany`, I used `bulkWrite` with updateOne operations in upsert mode `(upsert: true)`.This checks if a document with the same `id` and `source` exists; if it does, it updates the document; if not, it inserts a new one.
